@@ -139,6 +139,17 @@ function normalizeDomain(input: string): string {
 }
 
 export async function POST(request: Request) {
+  const userKey = request.headers.get("x-anthropic-key")?.trim();
+  if (!userKey || !/^sk-ant-[a-zA-Z0-9_-]{20,}$/.test(userKey)) {
+    return Response.json(
+      {
+        error:
+          "Bring your own Anthropic API key. Add it from the UI; it is never stored on the server.",
+      },
+      { status: 401 }
+    );
+  }
+
   let body: { domain?: string };
   try {
     body = await request.json();
@@ -177,7 +188,7 @@ export async function POST(request: Request) {
       let finalEmail: GeneratedEmail | null = null;
       let companyName: string | null = null;
 
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const client = new Anthropic({ apiKey: userKey });
       const messages: MessageParam[] = [
         { role: "user", content: `Enrich the company at domain: ${domain}` },
       ];

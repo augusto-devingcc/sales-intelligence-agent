@@ -9,11 +9,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { ToolStepCard, type StepState } from "./tool-step-card";
 import { EmailCard } from "./email-card";
+import { ApiKeyDialog } from "./api-key-dialog";
+import { useApiKey } from "@/lib/use-api-key";
 import type { Classification, GeneratedEmail } from "@/lib/tools/types";
 
 const EXAMPLES = ["linear.app", "notion.so", "vercel.com"];
 
 export function EnrichExperience() {
+  const { apiKey, setApiKey, hydrated } = useApiKey();
   const [domain, setDomain] = useState("");
   const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [iteration, setIteration] = useState(0);
@@ -103,6 +106,13 @@ export function EnrichExperience() {
   const startEnrichment = useCallback(
     async (target: string) => {
       if (!target) return;
+      if (!apiKey) {
+        setErrorMsg(
+          "Add your Anthropic API key first. The key is stored only in your browser."
+        );
+        setStatus("error");
+        return;
+      }
       abortRef.current?.abort();
       reset();
       setStatus("running");
@@ -114,7 +124,10 @@ export function EnrichExperience() {
       try {
         const res = await fetch("/api/enrich", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Anthropic-Key": apiKey,
+          },
           body: JSON.stringify({ domain: target }),
           signal: controller.signal,
         });
@@ -150,7 +163,7 @@ export function EnrichExperience() {
         setStatus("error");
       }
     },
-    [reset, handleEvent]
+    [reset, handleEvent, apiKey]
   );
 
   const onSubmit = (e: React.FormEvent) => {
@@ -209,7 +222,7 @@ export function EnrichExperience() {
         </Button>
       </form>
 
-      <div className="mt-3 flex flex-wrap gap-2 justify-center">
+      <div className="mt-3 flex flex-wrap gap-2 justify-center items-center">
         {EXAMPLES.map((ex) => (
           <button
             key={ex}
@@ -224,7 +237,17 @@ export function EnrichExperience() {
             Try {ex}
           </button>
         ))}
+        {hydrated && (
+          <ApiKeyDialog apiKey={apiKey} onSave={setApiKey} triggerVariant="compact" />
+        )}
       </div>
+
+      {hydrated && !apiKey && (
+        <div className="mt-6 max-w-2xl mx-auto rounded-md border border-[#fbbf24]/30 bg-[#fbbf24]/5 p-3 text-sm text-[#fbbf24]/90">
+          This demo runs on your own Anthropic API key. The key lives only in your browser.
+          Add one above to enable the agent. Each run costs roughly $0.20 to $0.40.
+        </div>
+      )}
 
       {(activeDomain || isRunning) && (
         <div className="mt-6 flex items-center justify-center gap-2 text-xs text-[#94a3b8]">
